@@ -75,6 +75,8 @@ NS_ASSUME_NONNULL_BEGIN
  
  @return A new instance created from the json, or nil if an error occurs.
  */
+
+// 入口方法
 + (nullable instancetype)yy_modelWithJSON:(id)json;
 
 /**
@@ -300,6 +302,8 @@ NS_ASSUME_NONNULL_BEGIN
  
  @return A custom mapper for properties.
  */
+
+// 自定义属性映射
 + (nullable NSDictionary<NSString *, id> *)modelCustomPropertyMapper;
 
 /**
@@ -329,6 +333,8 @@ NS_ASSUME_NONNULL_BEGIN
  
  @return A class mapper.
  */
+
+// 容器属性的
 + (nullable NSDictionary<NSString *, id> *)modelContainerPropertyGenericClass;
 
 /**
@@ -363,6 +369,7 @@ NS_ASSUME_NONNULL_BEGIN
  @return Class to create from this dictionary, `nil` to use current class.
 
  */
+// 更改model 的 class
 + (nullable Class)modelCustomClassForDictionary:(NSDictionary *)dictionary;
 
 /**
@@ -371,6 +378,7 @@ NS_ASSUME_NONNULL_BEGIN
  
  @return An array of property's name.
  */
+//黑名单
 + (nullable NSArray<NSString *> *)modelPropertyBlacklist;
 
 /**
@@ -393,6 +401,8 @@ NS_ASSUME_NONNULL_BEGIN
  
  @return Returns the modified dictionary, or nil to ignore this model.
  */
+//
+// 校验 或者 过滤
 - (NSDictionary *)modelCustomWillTransformFromDictionary:(NSDictionary *)dic;
 
 /**

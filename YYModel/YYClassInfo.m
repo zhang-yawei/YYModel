@@ -117,14 +117,18 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     if (!method) return nil;
     self = [super init];
     _method = method;
+        // 方法名
     _sel = method_getName(method);
+        // 函数地址 imp指针
     _imp = method_getImplementation(method);
     const char *name = sel_getName(_sel);
     if (name) {
+        // 赋值给方法名
         _name = [NSString stringWithUTF8String:name];
     }
     const char *typeEncoding = method_getTypeEncoding(method);
     if (typeEncoding) {
+        //typeEncoding  方法的参数和返回类型
         _typeEncoding = [NSString stringWithUTF8String:typeEncoding];
     }
     char *returnType = method_copyReturnType(method);
@@ -162,6 +166,11 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     YYEncodingType type = 0;
     unsigned int attrCount;
     objc_property_attribute_t *attrs = property_copyAttributeList(property, &attrCount);
+// objc_property_attribute_t  属性的特性列表,执行这样的一个结构体
+//    typedef struct {
+//        const char *name;           // 特性名
+//        const char *value;          // 特性值
+//    } objc_property_attribute_t
     for (unsigned int i = 0; i < attrCount; i++) {
         switch (attrs[i].name[0]) {
             case 'T': { // Type encoding
@@ -238,6 +247,7 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     
     _type = type;
     if (_name.length) {
+        // 保存setter 和getter 方法
         if (!_getter) {
             _getter = NSSelectorFromString(_name);
         }
@@ -265,7 +275,7 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     }
     _name = NSStringFromClass(cls);
     [self _update];
-
+// 递归 父类的classInfo
     _superClassInfo = [self.class classInfoWithClass:_superCls];
     return self;
 }
@@ -282,7 +292,9 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
         NSMutableDictionary *methodInfos = [NSMutableDictionary new];
         _methodInfos = methodInfos;
         for (unsigned int i = 0; i < methodCount; i++) {
+            // 取出所有的类的所有的方法
             YYClassMethodInfo *info = [[YYClassMethodInfo alloc] initWithMethod:methods[i]];
+                // 如果方法名存在,就用方法名做key 存储 YYClassMethodInfo
             if (info.name) methodInfos[info.name] = info;
         }
         free(methods);
@@ -293,6 +305,7 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
         NSMutableDictionary *propertyInfos = [NSMutableDictionary new];
         _propertyInfos = propertyInfos;
         for (unsigned int i = 0; i < propertyCount; i++) {
+            // 同样道理,缓存类的属性信息
             YYClassPropertyInfo *info = [[YYClassPropertyInfo alloc] initWithProperty:properties[i]];
             if (info.name) propertyInfos[info.name] = info;
         }
@@ -305,6 +318,7 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
         NSMutableDictionary *ivarInfos = [NSMutableDictionary new];
         _ivarInfos = ivarInfos;
         for (unsigned int i = 0; i < ivarCount; i++) {
+            // 同理,缓存变量信息
             YYClassIvarInfo *info = [[YYClassIvarInfo alloc] initWithIvar:ivars[i]];
             if (info.name) ivarInfos[info.name] = info;
         }
@@ -334,15 +348,18 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     static dispatch_semaphore_t lock;
     dispatch_once(&onceToken, ^{
         classCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        
         metaCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         lock = dispatch_semaphore_create(1);
     });
     dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
+    // 判断cls是不是metaClass,从对应的cache中取
     YYClassInfo *info = CFDictionaryGetValue(class_isMetaClass(cls) ? metaCache : classCache, (__bridge const void *)(cls));
     if (info && info->_needUpdate) {
         [info _update];
     }
     dispatch_semaphore_signal(lock);
+    // 如果没有取到
     if (!info) {
         info = [[YYClassInfo alloc] initWithClass:cls];
         if (info) {

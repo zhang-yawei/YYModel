@@ -324,7 +324,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     YYEncodingNSType _nsType;    ///< property's Foundation type
     BOOL _isCNumber;             ///< is c number type
     Class _cls;                  ///< property's class, or nil
-    Class _genericCls;           ///< container's generic class, or nil if threr's no generic class
+    Class _genericCls;           ///< container's generic class, or nil if threr's no generic class // protocol class or container class or nil
     SEL _getter;                 ///< getter, or nil if the instances cannot respond
     SEL _setter;                 ///< setter, or nil if the instances cannot respond
     BOOL _isKVCCompatible;       ///< YES if it can access with key-value coding
@@ -336,7 +336,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
      property->keyPath:   _mappedToKey:keyPath _mappedToKeyPath:keyPath(array) _mappedToKeyArray:nil
      property->keys:      _mappedToKey:keys[0] _mappedToKeyPath:nil/keyPath    _mappedToKeyArray:keys(array)
      */
-    NSString *_mappedToKey;      ///< the key mapped to
+    NSString *_mappedToKey;      ///< the key mapped to 映射到字典中的key
     NSArray *_mappedToKeyPath;   ///< the key path mapped to (nil if the name is not key path)
     NSArray *_mappedToKeyArray;  ///< the key(NSString) or keyPath(NSArray) array (nil if not mapped to multiple keys)
     YYClassPropertyInfo *_info;  ///< property's info
@@ -348,6 +348,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
 + (instancetype)metaWithClassInfo:(YYClassInfo *)classInfo propertyInfo:(YYClassPropertyInfo *)propertyInfo generic:(Class)generic {
     
     // support pseudo generic class with protocol name
+    // 这里是非容器类属性
     if (!generic && propertyInfo.protocols) {
         for (NSString *protocol in propertyInfo.protocols) {
             Class cls = objc_getClass(protocol.UTF8String);
@@ -358,6 +359,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
         }
     }
     
+    // 创建一个 YYModelPropertyMeta
     _YYModelPropertyMeta *meta = [self new];
     meta->_name = propertyInfo.name;
     meta->_type = propertyInfo.type;
@@ -367,6 +369,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     if ((meta->_type & YYEncodingTypeMask) == YYEncodingTypeObject) {
         meta->_nsType = YYClassGetNSType(propertyInfo.cls);
     } else {
+        //是否为数字
         meta->_isCNumber = YYEncodingTypeIsCNumber(meta->_type);
     }
     if ((meta->_type & YYEncodingTypeMask) == YYEncodingTypeStruct) {
@@ -400,17 +403,20 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     meta->_cls = propertyInfo.cls;
     
     if (generic) {
+        // 是否更改了model的class
         meta->_hasCustomClassFromDictionary = [generic respondsToSelector:@selector(modelCustomClassForDictionary:)];
     } else if (meta->_cls && meta->_nsType == YYEncodingTypeNSUnknown) {
         meta->_hasCustomClassFromDictionary = [meta->_cls respondsToSelector:@selector(modelCustomClassForDictionary:)];
     }
     
     if (propertyInfo.getter) {
+        // 属性的get方法
         if ([classInfo.cls instancesRespondToSelector:propertyInfo.getter]) {
             meta->_getter = propertyInfo.getter;
         }
     }
     if (propertyInfo.setter) {
+        // 属性的setter 方法
         if ([classInfo.cls instancesRespondToSelector:propertyInfo.setter]) {
             meta->_setter = propertyInfo.setter;
         }
@@ -457,7 +463,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     /// Key:mapped key and key path, Value:_YYModelPropertyMeta.
     NSDictionary *_mapper;
     /// Array<_YYModelPropertyMeta>, all property meta of this model.
-    NSArray *_allPropertyMetas;
+    NSArray *_allPropertyMetas; // 所有的属性 _YYModelPropertyMeta
     /// Array<_YYModelPropertyMeta>, property meta which is mapped to a key path.
     NSArray *_keyPathPropertyMetas;
     /// Array<_YYModelPropertyMeta>, property meta which is mapped to multi keys.
@@ -476,6 +482,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
 
 @implementation _YYModelMeta
 - (instancetype)initWithClass:(Class)cls {
+    // YYClassInfo 包含 父类的信息,类的方法列表,属性列表,变量列表等
     YYClassInfo *classInfo = [YYClassInfo classInfoWithClass:cls];
     if (!classInfo) return nil;
     self = [super init];
@@ -499,7 +506,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     }
     
     // Get container property's generic class
-    NSDictionary *genericMapper = nil;
+    NSDictionary *genericMapper = nil; // 容器类属性的  属性和class
     if ([cls respondsToSelector:@selector(modelContainerPropertyGenericClass)]) {
         genericMapper = [(id<YYModel>)cls modelContainerPropertyGenericClass];
         if (genericMapper) {
@@ -509,6 +516,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
                 Class meta = object_getClass(obj);
                 if (!meta) return;
                 if (class_isMetaClass(meta)) {
+                    //  tem 里装的是 key 和key Class
                     tmp[key] = obj;
                 } else if ([obj isKindOfClass:[NSString class]]) {
                     Class cls = NSClassFromString(obj);
@@ -533,7 +541,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
                                                                     propertyInfo:propertyInfo
                                                                          generic:genericMapper[propertyInfo.name]];
             if (!meta || !meta->_name) continue;
-            if (!meta->_getter || !meta->_setter) continue;
+            if (!meta->_getter || !meta->_setter) continue; // 属性是否有geter和setter
             if (allPropertyMetas[meta->_name]) continue;
             allPropertyMetas[meta->_name] = meta;
         }
@@ -547,6 +555,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     NSMutableArray *multiKeysPropertyMetas = [NSMutableArray new];
     
     if ([cls respondsToSelector:@selector(modelCustomPropertyMapper)]) {
+        // 映射
         NSDictionary *customMapper = [(id <YYModel>)cls modelCustomPropertyMapper];
         [customMapper enumerateKeysAndObjectsUsingBlock:^(NSString *propertyName, NSString *mappedToKey, BOOL *stop) {
             _YYModelPropertyMeta *propertyMeta = allPropertyMetas[propertyName];
@@ -567,6 +576,8 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
                     }
                 }
                 if (keyPath.count > 1) {
+                    
+                    // key patch 是干嘛的
                     propertyMeta->_mappedToKeyPath = keyPath;
                     [keyPathPropertyMetas addObject:propertyMeta];
                 }
@@ -629,15 +640,19 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     if (!cls) return nil;
     static CFMutableDictionaryRef cache;
     static dispatch_once_t onceToken;
-    static dispatch_semaphore_t lock;
+    static dispatch_semaphore_t lock;  //
     dispatch_once(&onceToken, ^{
+        // 生成字典 和
         cache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        // 常见一个 初始值为1的 semaphore 
         lock = dispatch_semaphore_create(1);
     });
     dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
+    //这里做了一个缓存
     _YYModelMeta *meta = CFDictionaryGetValue(cache, (__bridge const void *)(cls));
     dispatch_semaphore_signal(lock);
     if (!meta || meta->_classInfo.needUpdate) {
+        // 如果meta不存在或者是需要更新,就重新创建一个
         meta = [[_YYModelMeta alloc] initWithClass:cls];
         if (meta) {
             dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
@@ -1432,6 +1447,7 @@ static NSString *ModelDescription(NSObject *model) {
 
 @implementation NSObject (YYModel)
 
+// json转化为dic
 + (NSDictionary *)_yy_dictionaryWithJSON:(id)json {
     if (!json || json == (id)kCFNull) return nil;
     NSDictionary *dic = nil;
@@ -1450,13 +1466,16 @@ static NSString *ModelDescription(NSObject *model) {
     return dic;
 }
 
+// 入口方法
 + (instancetype)yy_modelWithJSON:(id)json {
+    
     NSDictionary *dic = [self _yy_dictionaryWithJSON:json];
     return [self yy_modelWithDictionary:dic];
 }
 
 + (instancetype)yy_modelWithDictionary:(NSDictionary *)dictionary {
     if (!dictionary || dictionary == (id)kCFNull) return nil;
+// 如果不是字典,return nil
     if (![dictionary isKindOfClass:[NSDictionary class]]) return nil;
     
     Class cls = [self class];

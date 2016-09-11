@@ -101,7 +101,7 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding);
  */
 @interface YYClassMethodInfo : NSObject
 @property (nonatomic, assign, readonly) Method method;                  ///< method opaque struct
-@property (nonatomic, strong, readonly) NSString *name;                 ///< method name
+@property (nonatomic, strong, readonly) NSString *name;                  ///< method name
 @property (nonatomic, assign, readonly) SEL sel;                        ///< method's selector
 @property (nonatomic, assign, readonly) IMP imp;                        ///< method's implementation
 @property (nonatomic, strong, readonly) NSString *typeEncoding;         ///< method's parameter and return types
